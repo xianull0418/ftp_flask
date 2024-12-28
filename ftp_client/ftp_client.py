@@ -77,12 +77,26 @@ class FTPClient:
             sock.send(json.dumps(command).encode())
             
             # 接收响应
-            response = json.loads(sock.recv(1024).decode())
+            response_data = b''
+            while True:
+                chunk = sock.recv(8192)  # 使用更大的缓冲区
+                if not chunk:
+                    break
+                response_data += chunk
+                if response_data.endswith(b'}'):  # 检查是否接收完整的JSON
+                    break
+                    
+            # 解析响应
+            response = json.loads(response_data.decode())
             if response['status'] != 'success':
                 raise Exception(response['message'])
                 
             return response['files']
             
+        except json.JSONDecodeError as e:
+            print(f"JSON解析错误: {e}")
+            print(f"接收到的数据: {response_data.decode()}")
+            raise Exception(f"获取文件列表失败: 服务器响应格式错误")
         except Exception as e:
             raise Exception(f"获取文件列表失败: {str(e)}")
 
