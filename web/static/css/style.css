@@ -1,0 +1,231 @@
+:root {
+    --primary-color: #4a90e2;
+    --primary-dark: #357abd;
+    --text-color: #333;
+    --text-light: #666;
+    --text-dark: #000;
+    --bg-white: #fff;
+    --bg-light: #f5f7fa;
+    --bg-hover: #e9ecef;
+    --border-color: #ddd;
+    --shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --transition: all 0.3s ease;
+}
+
+/* 基础样式 */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.5;
+    color: var(--text-color);
+    background: var(--bg-light);
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 文件管理器样式 */
+.file-manager {
+    background: var(--bg-white);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin: 20px 0;
+}
+
+.path-bar {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-light);
+    border-radius: 8px 8px 0 0;
+}
+
+.path-item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.path-item:hover {
+    background: var(--bg-hover);
+}
+
+.path-separator {
+    margin: 0 8px;
+    color: var(--text-light);
+}
+
+/* 文件列表样式 */
+.file-list {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.file-list th,
+.file-list td {
+    padding: 12px 20px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.file-list th {
+    background: var(--bg-light);
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 上传区域样式 */
+.upload-zone {
+    padding: 20px;
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    margin: 20px;
+    background: var(--bg-light);
+    transition: var(--transition);
+}
+
+.upload-zone.drag-over {
+    border-color: var(--primary-color);
+    background: var(--bg-hover);
+}
+
+.upload-progress {
+    margin-top: 10px;
+    display: none;
+}
+
+.progress-bar {
+    height: 4px;
+    background: var(--bg-light);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--primary-color);
+    width: 0;
+    transition: width 0.3s ease;
+}
+
+/* 服务器列表样式 */
+.server-list {
+    margin-bottom: 20px;
+}
+
+.server-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.server-info {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.server-name {
+    font-weight: 500;
+}
+
+.server-user {
+    color: var(--text-light);
+}
+
+.server-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background: var(--primary-color);
+    color: white;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn:hover {
+    background: var(--primary-dark);
+}
+
+.btn-secondary {
+    background: var(--bg-light);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-hover);
+}
+
+/* 连接表单样式 */
+.connect-form {
+    background: var(--bg-white);
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin-bottom: 20px;
+}
+
+.connect-form h2 {
+    margin: 0 0 20px;
+    color: var(--text-dark);
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-color);
+}
+
+.form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    transition: var(--transition);
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+} 

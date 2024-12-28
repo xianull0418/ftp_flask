@@ -1,14 +1,31 @@
-from flask import Flask, render_template, request, jsonify, session, send_file
+from flask import Flask, render_template, request, jsonify, session, send_file, redirect, url_for
 from pathlib import Path
 import os
 import sys
+from functools import wraps
+import time
+import socket
+import json
 
 # 添加项目根目录到 Python 路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
 
-from server.auth import authenticate_user, get_user_permissions
-from server.ssh_manager import ssh_manager
-from server.config import SSH_CONFIG
+from .config import FTP_CONFIG, TEMP_DIR, AUTH_CONFIG
+from .server_manager import server_manager
+
+# 认证相关函数
+def authenticate_user(username, password):
+    """验证用户名和密码"""
+    if username in AUTH_CONFIG['users']:
+        return AUTH_CONFIG['users'][username]['password'] == password
+    return False
+
+def get_user_permissions(username):
+    """获取用户权限"""
+    if username in AUTH_CONFIG['users']:
+        return AUTH_CONFIG['users'][username]['permissions']
+    return []
 
 # 获取当前文件所在目录
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
@@ -19,29 +36,41 @@ app = Flask(__name__,
            static_folder=static_dir)
 app.secret_key = 'your-secret-key'  # 在生产环境中使用安全的密钥
 
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @app.route('/')
+@login_required
 def index():
-    if 'username' not in session:
-        return render_template('login.html')
     return render_template('dashboard.html', 
                          username=session['username'],
                          permissions=get_user_permissions(session['username']))
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
-    username = request.form['username']
-    password = request.form['password']
-    
-    if authenticate_user(username, password):
-        session['username'] = username
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'message': '用户名或密码错误'})
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if authenticate_user(username, password):
+            session['username'] = username
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'message': '用户名或密码错误'})
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
 
 @app.route('/files')
+@login_required
 def list_files():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
     root_dir = Path('./files')
     files = []
     for file_path in root_dir.glob('**/*'):
@@ -54,10 +83,8 @@ def list_files():
     return jsonify({'files': files})
 
 @app.route('/connect/password', methods=['POST'])
+@login_required
 def connect_with_password():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
     data = request.json
     try:
         connection_id = ssh_manager.connect_with_password(
@@ -77,11 +104,8 @@ def connect_with_password():
         })
 
 @app.route('/connect/key', methods=['POST'])
+@login_required
 def connect_with_key():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
-    # 处理上传的密钥文件
     if 'key_file' not in request.files:
         return jsonify({'error': '未提供密钥文件'})
         
@@ -109,35 +133,13 @@ def connect_with_key():
             'error': str(e)
         })
 
-@app.route('/remote/execute', methods=['POST'])
-def execute_remote_command():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
-    data = request.json
-    try:
-        result = ssh_manager.execute_command(
-            data['connection_id'],
-            data['command']
-        )
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
-
 @app.route('/remote/disconnect', methods=['POST'])
 def disconnect_remote():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
+    """断开FTP连接"""
     data = request.json
     try:
-        ssh_manager.close_connection(data['connection_id'])
+        # 使用 server_manager 而不是 ssh_manager
+        server_manager.disconnect(data['connection_id'])
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({
@@ -146,81 +148,95 @@ def disconnect_remote():
         })
 
 @app.route('/remote/files', methods=['POST'])
+@login_required
 def get_remote_files():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
     data = request.json
     try:
-        # 执行ls命令获取文件列表
-        result = ssh_manager.execute_command(
+        print(f"获取远程文件列表，参数: {data}")  # 添加日志
+        
+        # 使用FTP客户端获取文件列表
+        files = server_manager.list_files(
             data['connection_id'],
-            f"ls -la --time-style=long-iso {data['path']}"  # 使用标准化的时间格式
+            data.get('path', '/')
         )
         
-        if result['stderr']:
-            return jsonify({
-                'success': False,
-                'error': result['stderr']
-            })
-        
-        # 解析ls命令输出
-        files = []
-        for line in result['stdout'].splitlines():
-            try:
-                if line.startswith('total ') or not line.strip():
-                    continue
-                    
-                parts = line.split(maxsplit=8)  # 最多分割8次，保持文件名完整
-                if len(parts) >= 8:
-                    permissions = parts[0]
-                    size = parts[4]
-                    date = f"{parts[5]} {parts[6]}"  # 合并日期和时间
-                    name = parts[-1]  # 最后一部分是文件名
-                    
-                    if name not in ['.', '..']:
-                        files.append({
-                            'name': name,
-                            'type': 'directory' if permissions.startswith('d') else 'file',
-                            'size': int(size),
-                            'modified': date,
-                            'permissions': permissions
-                        })
-            except Exception as e:
-                print(f"解析行出错: {line}, 错误: {str(e)}")
-                continue
+        print(f"获取到文件列表: {files}")  # 添加日志
         
         return jsonify({
             'success': True,
             'files': files
         })
     except Exception as e:
-        print(f"获取文件列表出错: {str(e)}")  # 添加服务器��日志
+        print(f"获取文件列表出错: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)
         })
 
+@app.route('/remote/upload', methods=['POST'])
+def upload_remote_file():
+    """准备文件上传"""
+    if 'username' not in session:
+        return jsonify({'status': 'error', 'message': '未登录'})
+        
+    try:
+        data = request.json  # 使用 request.json 而不是 request.files
+        if not data:
+            return jsonify({'status': 'error', 'message': '无效的请求数据'})
+            
+        print(f"准备上传文件，参数: {data}")  # 添加日志
+        
+        # 发送UPLOAD命令到FTP服务器
+        command = {
+            'command': 'UPLOAD',
+            'args': {
+                'filename': data['filename'],
+                'size': data['size']
+            }
+        }
+        
+        # 获取FTP服务器响应
+        sock = server_manager.get_connection(data['connection_id'])
+        if not sock:
+            return jsonify({'status': 'error', 'message': '未找到连接'})
+            
+        sock.send(json.dumps(command).encode())
+        response = json.loads(sock.recv(1024).decode())
+        
+        print(f"FTP服务器响应: {response}")  # 添加日志
+        return jsonify(response)
+        
+    except Exception as e:
+        print(f"准备上传失败: {e}")  # 添加日志
+        return jsonify({
+            'status': 'error',
+            'message': f'准备上传失败: {str(e)}'
+        })
+
 @app.route('/remote/download', methods=['POST'])
 def download_remote_file():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
-        
     data = request.json
     try:
-        # 创建临时目录存储下载的文件
+        # 创建临时目录
         temp_dir = Path('./temp_downloads')
         temp_dir.mkdir(exist_ok=True)
-        
-        # 生成临时文件路径
         local_path = temp_dir / f"{session['username']}_{os.path.basename(data['file_path'])}"
         
-        # 下载文件
-        ssh_manager.download_file(
+        # 使用FTP下载
+        transfer_id = server_manager.download_file(
             data['connection_id'],
             data['file_path'],
             str(local_path)
         )
+        
+        # 等待下载完成
+        while True:
+            status = server_manager.get_transfer_status(data['connection_id'], transfer_id)
+            if status['status'] == 'completed':
+                break
+            elif status['status'] == 'error':
+                raise Exception(status['message'])
+            time.sleep(0.5)
         
         # 发送文件
         response = send_file(
@@ -231,77 +247,171 @@ def download_remote_file():
         
         # 清理临时文件
         os.remove(local_path)
-        
         return response
+        
     except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
         })
 
-@app.route('/remote/upload', methods=['POST'])
-def upload_remote_file():
-    if 'username' not in session:
-        return jsonify({'error': '未登录'})
+@app.route('/transfer/status/<transfer_id>')
+def get_transfer_status(transfer_id):
+    """获取传输状态"""
+    try:
+        status = server_manager.get_transfer_status(transfer_id)
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        })
+
+@app.route('/servers')
+@login_required
+def list_servers():
+    """获取所有已连接的服务器列表"""
+    servers = {
+        'local': server_manager.local_server,
+        **server_manager.remote_servers
+    }
+    return jsonify({'servers': servers})
+
+@app.route('/transfer', methods=['POST'])
+@login_required
+def transfer_file():
+    """在两个服务器之间传输文件"""
+    data = request.json
+    try:
+        transfer_id = server_manager.start_transfer(
+            data['source_id'],
+            data['target_id'],
+            data['file_path']
+        )
+        return jsonify({
+            'success': True,
+            'transfer_id': transfer_id
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/servers/<server_id>/files', methods=['GET'])
+@login_required
+def list_server_files(server_id):
+    """列出服务器上的文件"""
+    path = request.args.get('path', '/')
+    
+    try:
+        # 使用FTP方式获取文件列表
+        files = server_manager.list_files(server_id, path)
+        return jsonify({'success': True, 'files': files})
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/transfer', methods=['POST'])
+@login_required
+def transfer_files():
+    """在服务器之间传输文件"""
+    data = request.json
+    try:
+        success = server_manager.transfer_file(
+            data['source_id'],
+            data['target_id'],
+            data['source_path'],
+            data['target_path']
+        )
+        return jsonify({'success': success})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/connect/ftp', methods=['POST'])
+@login_required
+def connect_ftp():
+    """连接FTP服务器"""
+    data = request.json
+    try:
+        print(f"尝试连接FTP服务器: {data}")
+        connection_id = server_manager.connect_remote(
+            host=data['host'],
+            username=data['username'],
+            password=data.get('password', ''),
+            port=data.get('ftp_port', 21)
+        )
         
+        # 获取连接信息
+        connection = server_manager.ftp_client.connections[connection_id]
+        
+        return jsonify({
+            'success': True,
+            'connection_id': connection_id,
+            'permissions': connection['permissions']
+        })
+    except Exception as e:
+        print(f"FTP连接失败: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/remote/upload_data', methods=['POST'])
+def upload_data():
+    """处理文件数据上传"""
     if 'file' not in request.files:
         return jsonify({'error': '未提供文件'})
         
     file = request.files['file']
     connection_id = request.form['connection_id']
-    remote_path = request.form['remote_path']
+    transfer_id = request.form['transfer_id']
+    port = int(request.form['port'])
     
     try:
-        # 创建临时目录存储上传的文件
-        temp_dir = Path('./temp_uploads')
-        temp_dir.mkdir(exist_ok=True)
+        # 接到FTP服务器的数据端口
+        data_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        data_sock.settimeout(30)  # 设置30秒超时
         
-        # 保存文件到临时目录
-        temp_path = temp_dir / f"{session['username']}_{file.filename}"
-        file.save(temp_path)
+        # 从connection_id中获取主机地址
+        host = connection_id.split(':')[0]
+        print(f"正在连接数据端口: {host}:{port}")  # 添加日志
         
-        # 构建远程路径（确保路径正确）
-        remote_file_path = os.path.join(remote_path, file.filename).replace('\\', '/')
-        if not remote_file_path.startswith('/'):
-            remote_file_path = '/' + remote_file_path
-            
-        print(f"上传文件到远程路径: {remote_file_path}")  # 添加调试日志
+        # 尝试连接
+        for i in range(3):  # 最多重试3次
+            try:
+                data_sock.connect((host, port))
+                print(f"数据连接成功")
+                break
+            except Exception as e:
+                print(f"连接尝试 {i+1} 失败: {e}")
+                if i == 2:  # 最后一次尝试也失败
+                    raise
+                time.sleep(1)  # 等待1秒后重试
         
-        try:
-            # 上传文件到远程服务器
-            ssh_manager.upload_file(
-                connection_id,
-                str(temp_path),
-                remote_file_path
-            )
+        # 发送文件数据
+        total_sent = 0
+        while True:
+            data = file.read(8192)
+            if not data:
+                break
+            data_sock.send(data)
+            total_sent += len(data)
+            print(f"\r已发送: {total_sent} bytes", end='')
             
-            # 验证文件是否上传成功
-            result = ssh_manager.execute_command(
-                connection_id,
-                f"ls -l '{remote_file_path}'"
-            )
-            
-            if result['stderr']:
-                raise Exception(f"文件验证失败: {result['stderr']}")
-                
-            return jsonify({
-                'success': True,
-                'message': f'文件 {file.filename} 上传成功'
-            })
-            
-        except Exception as e:
-            raise Exception(f"文件上传失败: {str(e)}")
-            
+        print(f"\n文件发送完成")
+        return jsonify({'success': True})
+        
     except Exception as e:
-        print(f"上传错误: {str(e)}")  # 添加错误日志
+        print(f"上传文件失败: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'上传文件失败: {str(e)}'
         })
     finally:
-        # 清理临时文件
-        if temp_path.exists():
-            temp_path.unlink()
+        data_sock.close()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000) 
