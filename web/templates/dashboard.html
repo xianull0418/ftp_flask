@@ -236,46 +236,74 @@
             padding: 25px;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .explorer-title {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .explorer-title h3 {
+            margin: 0;
+            color: var(--text-color);
+            font-size: 20px;
+            font-weight: 500;
+        }
+
+        #currentPathDisplay {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        #currentPath {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .explorer-actions {
+            display: flex;
+            gap: 10px;
         }
 
         .path-navigator {
+            padding: 20px 25px;
             background: var(--bg-white);
-            padding: 20px;
-            border-radius: 10px;
-            margin: 15px 25px;
-            box-shadow: var(--shadow);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .path-control {
             display: flex;
-            align-items: center;
-            background: var(--bg-light);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 8px 16px;
             gap: 10px;
-        }
-
-        .path-segment {
-            color: var(--primary-color);
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 6px;
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .path-segment:hover {
-            background: rgba(52, 152, 219, 0.1);
+            margin-bottom: 10px;
         }
 
         .path-input {
             flex: 1;
-            border: none;
-            outline: none;
-            padding: 8px;
+            padding: 8px 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
             font-size: 14px;
-            background: transparent;
+            transition: var(--transition);
+        }
+
+        .path-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+
+        .path-segments {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 6px;
         }
 
         /* 文件操作按钮样式 */
@@ -584,26 +612,13 @@
             </div>
         </div>
 
-        <table class="file-list">
-            <thead>
-                <tr>
-                    <th>文件名</th>
-                    <th>大小</th>
-                    <th>修改时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="fileListBody">
-            </tbody>
-        </table>
-
         <div class="remote-connection">
             <div class="section-header">
                 <h3>远程服务器连接</h3>
             </div>
             <div class="connection-methods">
                 <div class="connection-card">
-                    <h4>密码连接</h4>
+                    <h4>密���连接</h4>
                     <form id="passwordConnectForm">
                         <div class="form-group">
                             <label>主机地址</label>
@@ -672,7 +687,10 @@
             
             <div id="remoteFileExplorer" class="remote-file-explorer" style="display: none;">
                 <div class="explorer-header">
-                    <h3>远程文件浏览器: <span id="currentServer"></span></h3>
+                    <div class="explorer-title">
+                        <h3>远程文件浏览器: <span id="currentServer"></span></h3>
+                        <div id="currentPathDisplay">当前路径: <span id="currentPath">/</span></div>
+                    </div>
                     <div class="explorer-actions">
                         <button class="btn btn-primary" onclick="document.getElementById('remoteFileInput').click()">
                             <i class="fas fa-upload"></i> 上传到当前目录
@@ -684,33 +702,40 @@
                                onchange="handleRemoteFileUpload(this.files)">
                     </div>
                 </div>
+
                 <div class="path-navigator">
                     <div class="path-control">
-                        <span class="path-prefix">当前路径:</span>
-                        <div class="path-segments" id="pathBreadcrumb">
-                            <span class="path-segment" onclick="showRemoteFiles(currentConnectionId, '/')">/</span>
-                        </div>
                         <input type="text" 
                                id="pathInput" 
                                class="path-input" 
                                placeholder="输入路径" 
                                value="/"
                                onkeydown="if(event.key === 'Enter') navigateToPath()">
+                        <button class="btn btn-primary" onclick="navigateToPath()">
+                            <i class="fas fa-arrow-right"></i> 转到
+                        </button>
+                    </div>
+                    <div class="path-segments" id="pathBreadcrumb">
+                        <!-- 面包屑导航将通过JavaScript动态生成 -->
                     </div>
                 </div>
-                <table class="file-list">
-                    <thead>
-                        <tr>
-                            <th>名称</th>
-                            <th>类型</th>
-                            <th>大小</th>
-                            <th>修改时间</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="remoteFileList">
-                    </tbody>
-                </table>
+
+                <div class="file-list-container">
+                    <table class="file-list">
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th>类型</th>
+                                <th>大小</th>
+                                <th>修改时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="remoteFileList">
+                            <!-- 文件列表将通过JavaScript动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -779,7 +804,7 @@
             });
         }
 
-        // 连接成功后添加服务器
+        // 连接成功后添加���务器
         function addConnectedServer(connectionId, host, username) {
             connectedServers.set(connectionId, {
                 host,
@@ -807,8 +832,22 @@
             path = normalizePath(path);
             currentConnectionId = connectionId;
             const serverInfo = connectedServers.get(connectionId);
+            
+            // 检查服务器信息
             if (!serverInfo) {
                 console.error('未找到服务器信息:', connectionId);
+                return;
+            }
+            
+            // 检查必要的DOM元素
+            const explorer = document.getElementById('remoteFileExplorer');
+            const currentServer = document.getElementById('currentServer');
+            const pathInput = document.getElementById('pathInput');
+            const currentPath = document.getElementById('currentPath');
+            const fileList = document.getElementById('remoteFileList');
+            
+            if (!explorer || !currentServer || !pathInput || !currentPath || !fileList) {
+                console.error('找不到必要的DOM元素');
                 return;
             }
             
@@ -835,29 +874,27 @@
                 }
                 
                 // 显示文件浏览器
-                const explorer = document.getElementById('remoteFileExplorer');
                 explorer.style.display = 'block';
                 
                 // 更新服务器和路径信息
-                document.getElementById('currentServer').textContent = serverInfo.host;
-                document.getElementById('pathInput').value = path;
-                document.getElementById('currentPath').textContent = path;
+                currentServer.textContent = serverInfo.host;
+                pathInput.value = path;
+                currentPath.textContent = path;
                 
                 // 更新面包屑导航
                 updateBreadcrumb(path);
                 
-                // 更新文件列表
-                const fileList = document.getElementById('remoteFileList');
+                // 清空并更新文件列表
                 fileList.innerHTML = '';
                 
-                // 添加返回上级目录的选项（除了在根目录时）
+                // 添加返回上级目录的选项
                 if (path !== '/') {
                     const parentPath = path.split('/').slice(0, -1).join('/') || '/';
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td colspan="4">
-                            <button onclick="showRemoteFiles('${connectionId}', '${parentPath}')">
-                                📁 ..
+                        <td colspan="5">
+                            <button class="btn btn-primary" onclick="showRemoteFiles('${connectionId}', '${parentPath}')">
+                                <i class="fas fa-arrow-up"></i> 返回上级目录
                             </button>
                         </td>
                     `;
@@ -870,8 +907,8 @@
                     tr.innerHTML = `
                         <td>
                             ${file.type === 'directory' 
-                                ? `📁 ${file.name}`
-                                : `📄 ${file.name}`
+                                ? `<i class="fas fa-folder"></i> ${file.name}`
+                                : `<i class="fas fa-file"></i> ${file.name}`
                             }
                         </td>
                         <td>${file.type}</td>
@@ -879,8 +916,12 @@
                         <td>${file.modified}</td>
                         <td>
                             ${file.type === 'directory' 
-                                ? `<button onclick="showRemoteFiles(currentConnectionId, '${path}/${file.name}')">打开</button>`
-                                : `<button onclick="downloadRemoteFile(currentConnectionId, '${path}/${file.name}')">下载</button>`
+                                ? `<button class="btn btn-primary" onclick="showRemoteFiles(currentConnectionId, '${path}/${file.name}')">
+                                     <i class="fas fa-folder-open"></i> 打开
+                                   </button>`
+                                : `<button class="btn btn-success" onclick="downloadRemoteFile(currentConnectionId, '${path}/${file.name}')">
+                                     <i class="fas fa-download"></i> 下载
+                                   </button>`
                             }
                         </td>
                     `;
@@ -952,7 +993,7 @@
                     alert('连接失败：' + result.error);
                 }
             } catch (err) {
-                alert('连��出错：' + err);
+                alert('连接出错：' + err);
             }
         };
 
