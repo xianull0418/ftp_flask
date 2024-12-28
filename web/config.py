@@ -10,18 +10,4 @@ FTP_CONFIG = {
 TEMP_DIR = {
     'uploads': './temp_uploads',
     'downloads': './temp_downloads'
-}
-
-# 用户认证配置
-AUTH_CONFIG = {
-    'users': {
-        'admin': {
-            'password': 'admin123',
-            'permissions': ['read', 'write', 'delete']
-        },
-        'guest': {
-            'password': 'guest123',
-            'permissions': ['read']
-        }
-    }
 } 

@@ -1,8 +1,7 @@
-from flask import Flask, render_template, request, jsonify, session, send_file, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file
 from pathlib import Path
 import os
 import sys
-from functools import wraps
 import time
 import socket
 import json
@@ -11,21 +10,8 @@ import json
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-from .config import FTP_CONFIG, TEMP_DIR, AUTH_CONFIG
+from .config import FTP_CONFIG, TEMP_DIR
 from .server_manager import server_manager
-
-# 认证相关函数
-def authenticate_user(username, password):
-    """验证用户名和密码"""
-    if username in AUTH_CONFIG['users']:
-        return AUTH_CONFIG['users'][username]['password'] == password
-    return False
-
-def get_user_permissions(username):
-    """获取用户权限"""
-    if username in AUTH_CONFIG['users']:
-        return AUTH_CONFIG['users'][username]['permissions']
-    return []
 
 # 获取当前文件所在目录
 template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'templates'))
@@ -34,42 +20,12 @@ static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static'))
 app = Flask(__name__, 
            template_folder=template_dir,
            static_folder=static_dir)
-app.secret_key = 'your-secret-key'  # 在生产环境中使用安全的密钥
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 @app.route('/')
-@login_required
 def index():
-    return render_template('dashboard.html', 
-                         username=session['username'],
-                         permissions=get_user_permissions(session['username']))
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        if authenticate_user(username, password):
-            session['username'] = username
-            return jsonify({'success': True})
-        return jsonify({'success': False, 'message': '用户名或密码错误'})
-    return render_template('login.html')
-
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    return redirect(url_for('login'))
+    return render_template('dashboard.html')
 
 @app.route('/files')
-@login_required
 def list_files():
     root_dir = Path('./files')
     files = []
@@ -83,7 +39,6 @@ def list_files():
     return jsonify({'files': files})
 
 @app.route('/connect/password', methods=['POST'])
-@login_required
 def connect_with_password():
     data = request.json
     try:
@@ -104,7 +59,6 @@ def connect_with_password():
         })
 
 @app.route('/connect/key', methods=['POST'])
-@login_required
 def connect_with_key():
     if 'key_file' not in request.files:
         return jsonify({'error': '未提供密钥文件'})
@@ -148,7 +102,6 @@ def disconnect_remote():
         })
 
 @app.route('/remote/files', methods=['POST'])
-@login_required
 def get_remote_files():
     data = request.json
     try:
@@ -268,7 +221,6 @@ def get_transfer_status(transfer_id):
         })
 
 @app.route('/servers')
-@login_required
 def list_servers():
     """获取所有已连接的服务器列表"""
     servers = {
@@ -278,7 +230,6 @@ def list_servers():
     return jsonify({'servers': servers})
 
 @app.route('/transfer', methods=['POST'])
-@login_required
 def transfer_file():
     """在两个服务器之间传输文件"""
     data = request.json
@@ -299,7 +250,6 @@ def transfer_file():
         })
 
 @app.route('/servers/<server_id>/files', methods=['GET'])
-@login_required
 def list_server_files(server_id):
     """列出服务器上的文件"""
     path = request.args.get('path', '/')
@@ -315,7 +265,6 @@ def list_server_files(server_id):
         })
 
 @app.route('/transfer', methods=['POST'])
-@login_required
 def transfer_files():
     """在服务器之间传输文件"""
     data = request.json
@@ -331,7 +280,6 @@ def transfer_files():
         return jsonify({'error': str(e)})
 
 @app.route('/connect/ftp', methods=['POST'])
-@login_required
 def connect_ftp():
     """连接FTP服务器"""
     data = request.json
