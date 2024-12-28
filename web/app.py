@@ -64,7 +64,7 @@ def connect_with_key():
         return jsonify({'error': '未提供密钥文件'})
         
     key_file = request.files['key_file']
-    key_path = os.path.join(SSH_CONFIG['key_folder'], f"{session['username']}_{key_file.filename}")
+    key_path = os.path.join(SSH_CONFIG['key_folder'], f"key_{key_file.filename}")
     key_file.save(key_path)
     
     try:
@@ -129,11 +129,8 @@ def get_remote_files():
 @app.route('/remote/upload', methods=['POST'])
 def upload_remote_file():
     """准备文件上传"""
-    if 'username' not in session:
-        return jsonify({'status': 'error', 'message': '未登录'})
-        
     try:
-        data = request.json  # 使用 request.json 而不是 request.files
+        data = request.json
         if not data:
             return jsonify({'status': 'error', 'message': '无效的请求数据'})
             
@@ -173,7 +170,7 @@ def download_remote_file():
         # 创建临时目录
         temp_dir = Path('./temp_downloads')
         temp_dir.mkdir(exist_ok=True)
-        local_path = temp_dir / f"{session['username']}_{os.path.basename(data['file_path'])}"
+        local_path = temp_dir / f"download_{os.path.basename(data['file_path'])}"
         
         # 使用FTP下载
         transfer_id = server_manager.download_file(
