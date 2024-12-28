@@ -1,0 +1,16 @@
+{
+  "admin": {
+    "password": "admin123",
+    "permissions": [
+      "read",
+      "write",
+      "delete"
+    ]
+  },
+  "anonymous": {
+    "password": "",
+    "permissions": [
+      "read"
+    ]
+  }
+}

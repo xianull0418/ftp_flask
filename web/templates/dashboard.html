@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FTP服务器 - 仪表板</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .file-list {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .file-list th, .file-list td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .file-list th {
+            background-color: #f8f9fa;
+        }
+        .upload-btn {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .upload-btn:hover {
+            background-color: #218838;
+        }
+        .remote-connection {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .connection-methods {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+        .password-connection, .key-connection {
+            flex: 1;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        form input {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        form button {
+            width: 100%;
+            padding: 10px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        form button:hover {
+            background: #0056b3;
+        }
+        .connected-servers {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .server-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .server-item {
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .server-item:hover {
+            background: #e9ecef;
+        }
+        .server-item.active {
+            background: #007bff;
+            color: white;
+        }
+        .remote-file-explorer {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .path-navigator {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .path-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        .path-input-group input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            align-items: center;
+            padding: 5px 0;
+        }
+        .breadcrumb-item {
+            cursor: pointer;
+            color: #007bff;
+        }
+        .breadcrumb-item:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb-separator {
+            color: #6c757d;
+            margin: 0 5px;
+        }
+        .explorer-toolbar {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .upload-progress {
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff;
+            border-radius: 4px;
+            display: none;
+        }
+        .progress-bar {
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #007bff;
+            width: 0;
+            transition: width 0.3s ease;
+        }
+        .current-path {
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+        .current-path span {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h2>欢迎, {{ username }}</h2>
+                <p>权限: {{ permissions|join(', ') }}</p>
+            </div>
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                上传文件
+            </button>
+            <input type="file" id="fileInput" style="display: none" onchange="handleFileUpload(this.files)">
+        </div>
+
+        <table class="file-list">
+            <thead>
+                <tr>
+                    <th>文件名</th>
+                    <th>大小</th>
+                    <th>修改时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="fileListBody">
+            </tbody>
+        </table>
+
+        <div class="remote-connection">
+            <h3>远程服务器连接</h3>
+            <div class="connection-methods">
+                <div class="password-connection">
+                    <h4>密码连接</h4>
+                    <form id="passwordConnectForm">
+                        <input type="text" name="host" placeholder="主机地址" required>
+                        <input type="text" name="ssh_username" placeholder="SSH用户名" required>
+                        <input type="password" name="ssh_password" placeholder="SSH密码" required>
+                        <input type="number" name="port" placeholder="端口 (默认22)" value="22">
+                        <button type="submit">连接</button>
+                    </form>
+                </div>
+                
+                <div class="key-connection">
+                    <h4>密钥连接</h4>
+                    <form id="keyConnectForm">
+                        <input type="text" name="host" placeholder="主机地址" required>
+                        <input type="text" name="ssh_username" placeholder="SSH用户名" required>
+                        <input type="file" name="key_file" required>
+                        <input type="password" name="key_password" placeholder="密钥密码（如果有）">
+                        <input type="number" name="port" placeholder="端口 (默认22)" value="22">
+                        <button type="submit">连接</button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="connected-servers">
+                <h3>已连接的服务器</h3>
+                <div id="serverList" class="server-list">
+                    <!-- 服务器列表将通过JavaScript动态添加 -->
+                </div>
+            </div>
+            
+            <div id="remoteFileExplorer" class="remote-file-explorer" style="display: none;">
+                <div class="explorer-header">
+                    <h3>远程文件浏览器: <span id="currentServer"></span></h3>
+                    <div class="path-navigator">
+                        <div class="path-input-group">
+                            <input type="text" id="pathInput" placeholder="输入路径" value="/">
+                            <button onclick="navigateToPath()">转到</button>
+                        </div>
+                        <div id="currentPathDisplay" class="current-path">
+                            当前路径: <span id="currentPath">/</span>
+                        </div>
+                        <div class="breadcrumb" id="pathBreadcrumb">
+                            <!-- 面包屑导航将通过JavaScript动态生成 -->
+                        </div>
+                    </div>
+                </div>
+                <div class="explorer-toolbar">
+                    <button class="upload-btn" onclick="document.getElementById('remoteFileInput').click()">
+                        上传到此目录
+                    </button>
+                    <input type="file" id="remoteFileInput" style="display: none" multiple onchange="handleRemoteFileUpload(this.files)">
+                </div>
+                <table class="file-list">
+                    <thead>
+                        <tr>
+                            <th>名称</th>
+                            <th>类型</th>
+                            <th>大小</th>
+                            <th>修改时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="remoteFileList">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadFiles() {
+            try {
+                const response = await fetch('/files');
+                const data = await response.json();
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                const tbody = document.getElementById('fileListBody');
+                tbody.innerHTML = '';
+                
+                data.files.forEach(file => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${file.name}</td>
+                        <td>${formatFileSize(file.size)}</td>
+                        <td>${new Date(file.modified * 1000).toLocaleString()}</td>
+                        <td>
+                            <button onclick="downloadFile('${file.name}')">下载</button>
+                            ${permissions.includes('delete') ? 
+                                `<button onclick="deleteFile('${file.name}')">删除</button>` : 
+                                ''}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('加载文件列表失败:', err);
+            }
+        }
+
+        function formatFileSize(bytes) {
+            const units = ['B', 'KB', 'MB', 'GB'];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(2)} ${units[unitIndex]}`;
+        }
+
+        // 页面加载时获取文件列表
+        loadFiles();
+
+        // 存储当前连接的服务器列表
+        let connectedServers = new Map();
+
+        // 更新服务器列表显示
+        function updateServerList() {
+            const serverList = document.getElementById('serverList');
+            serverList.innerHTML = '';
+            
+            connectedServers.forEach((serverInfo, connectionId) => {
+                const serverDiv = document.createElement('div');
+                serverDiv.className = 'server-item';
+                serverDiv.textContent = serverInfo.host;
+                serverDiv.onclick = () => showRemoteFiles(connectionId);
+                serverList.appendChild(serverDiv);
+            });
+        }
+
+        // 连接成功后添加服务器
+        function addConnectedServer(connectionId, host, username) {
+            connectedServers.set(connectionId, {
+                host,
+                username,
+                currentPath: '/'
+            });
+            updateServerList();
+        }
+
+        // 修改路径处理函数
+        function normalizePath(path) {
+            // 确保路径以/开头
+            if (!path.startsWith('/')) {
+                path = '/' + path;
+            }
+            // 移除结尾的/（除非是根路径）
+            if (path.length > 1 && path.endsWith('/')) {
+                path = path.slice(0, -1);
+            }
+            return path;
+        }
+
+        // 显示远程文件列表
+        async function showRemoteFiles(connectionId, path = '/') {
+            path = normalizePath(path);
+            currentConnectionId = connectionId;
+            const serverInfo = connectedServers.get(connectionId);
+            if (!serverInfo) {
+                console.error('未找到服务器信息:', connectionId);
+                return;
+            }
+            
+            try {
+                console.log('请求路径:', path);
+                const response = await fetch('/remote/files', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        connection_id: connectionId,
+                        path: path
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('服务器响应:', data);
+                
+                if (!data.success) {
+                    console.error('获取文件列表失败:', data.error);
+                    alert('获取文件列表失败：' + data.error);
+                    return;
+                }
+                
+                // 显示文件浏览器
+                const explorer = document.getElementById('remoteFileExplorer');
+                explorer.style.display = 'block';
+                
+                // 更新服务器和路径信息
+                document.getElementById('currentServer').textContent = serverInfo.host;
+                document.getElementById('pathInput').value = path;
+                document.getElementById('currentPath').textContent = path;
+                
+                // 更新面包屑导航
+                updateBreadcrumb(path);
+                
+                // 更新文件列表
+                const fileList = document.getElementById('remoteFileList');
+                fileList.innerHTML = '';
+                
+                // 添加返回上级目录的选项（除了在根目录时）
+                if (path !== '/') {
+                    const parentPath = path.split('/').slice(0, -1).join('/') || '/';
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td colspan="4">
+                            <button onclick="showRemoteFiles('${connectionId}', '${parentPath}')">
+                                📁 ..
+                            </button>
+                        </td>
+                    `;
+                    fileList.appendChild(tr);
+                }
+                
+                // 显示文件和目录
+                data.files.forEach(file => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            ${file.type === 'directory' 
+                                ? `📁 ${file.name}`
+                                : `📄 ${file.name}`
+                            }
+                        </td>
+                        <td>${file.type}</td>
+                        <td>${formatFileSize(file.size)}</td>
+                        <td>${file.modified}</td>
+                        <td>
+                            ${file.type === 'directory' 
+                                ? `<button onclick="showRemoteFiles(currentConnectionId, '${path}/${file.name}')">打开</button>`
+                                : `<button onclick="downloadRemoteFile(currentConnectionId, '${path}/${file.name}')">下载</button>`
+                            }
+                        </td>
+                    `;
+                    fileList.appendChild(tr);
+                });
+                
+                // 更新服务器信息中的当前路径
+                serverInfo.currentPath = path;
+                
+            } catch (err) {
+                console.error('获取远程文件列表失败:', err);
+                alert('获取远程文件列表失败: ' + err.message);
+            }
+        }
+
+        // 下载远程文件
+        async function downloadRemoteFile(connectionId, filePath) {
+            try {
+                const response = await fetch('/remote/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        connection_id: connectionId,
+                        file_path: filePath
+                    })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filePath.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const error = await response.json();
+                    alert('下载失败：' + error.error);
+                }
+            } catch (err) {
+                console.error('下载文件失败:', err);
+                alert('下载文件失败');
+            }
+        }
+
+        // 修改密码连接成功的处理
+        document.getElementById('passwordConnectForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            try {
+                const response = await fetch('/connect/password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('连接成功！');
+                    addConnectedServer(result.connection_id, data.host, data.ssh_username);
+                } else {
+                    alert('连接失败：' + result.error);
+                }
+            } catch (err) {
+                alert('连接出错：' + err);
+            }
+        };
+
+        // 修改密钥连接成功的处理
+        document.getElementById('keyConnectForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/connect/key', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert('连接成功！');
+                    addConnectedServer(
+                        result.connection_id, 
+                        formData.get('host'),
+                        formData.get('ssh_username')
+                    );
+                } else {
+                    alert('连接失败：' + result.error);
+                }
+            } catch (err) {
+                alert('连接出错：' + err);
+            }
+        };
+
+        // 更新面包屑导航
+        function updateBreadcrumb(path) {
+            const breadcrumb = document.getElementById('pathBreadcrumb');
+            breadcrumb.innerHTML = '';
+            
+            const parts = path.split('/').filter(Boolean);
+            let currentPath = '';
+            
+            // 添加根目录
+            const rootItem = document.createElement('span');
+            rootItem.className = 'breadcrumb-item';
+            rootItem.textContent = '/';
+            rootItem.onclick = () => showRemoteFiles(currentConnectionId, '/');
+            breadcrumb.appendChild(rootItem);
+            
+            parts.forEach((part, index) => {
+                if (index > 0) {
+                    const separator = document.createElement('span');
+                    separator.className = 'breadcrumb-separator';
+                    separator.textContent = '/';
+                    breadcrumb.appendChild(separator);
+                }
+                
+                currentPath += '/' + part;
+                const item = document.createElement('span');
+                item.className = 'breadcrumb-item';
+                item.textContent = part;
+                item.onclick = () => showRemoteFiles(currentConnectionId, currentPath);
+                breadcrumb.appendChild(item);
+            });
+        }
+
+        // 路径导航
+        function navigateToPath() {
+            const path = normalizePath(document.getElementById('pathInput').value);
+            if (path) {
+                showRemoteFiles(currentConnectionId, path);
+            }
+        }
+
+        // 处理远程文件上传
+        async function handleRemoteFileUpload(files) {
+            const currentPath = document.getElementById('currentPath').textContent;
+            const serverInfo = connectedServers.get(currentConnectionId);
+            if (!serverInfo) {
+                alert('未选择服务器');
+                return;
+            }
+            
+            for (const file of files) {
+                try {
+                    console.log(`准备上传文件: ${file.name} 到 ${currentPath}`);  // 添加调试日志
+                    
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('connection_id', currentConnectionId);
+                    formData.append('remote_path', currentPath);
+                    
+                    const response = await fetch('/remote/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    console.log('上传响应:', result);  // 添加调试日志
+                    
+                    if (result.success) {
+                        alert(`文件 ${file.name} 上传成功！`);
+                        // 刷新文件列表
+                        await showRemoteFiles(currentConnectionId, currentPath);
+                    } else {
+                        alert(`文件 ${file.name} 上传失败：${result.error}`);
+                    }
+                } catch (err) {
+                    console.error('上传文件失败:', err);
+                    alert(`文件 ${file.name} 上传失败: ${err.message}`);
+                }
+            }
+        }
+    </script>
+</body>
+</html> 

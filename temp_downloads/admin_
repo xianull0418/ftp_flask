@@ -1,0 +1,28 @@
+
+#!/bin/bash
+
+#创建jdk安装路径
+echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+echo jdk安装路径/usr/local/jdk1.8.0_361
+wget -c https://b2.999797.xyz/jdk-8u361-linux-x64.tar.gz
+tar -xf jdk-8u361-linux-x64.tar.gz -C /usr/local/
+
+#配置环境变量
+echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+echo 配置环境变量
+echo '#设置环境变量' >> /etc/profile
+echo 'export JAVA_HOME=/usr/local/jdk1.8.0_361' >> /etc/profile
+echo 'export CLASSPATH=$CLASSPATH:$JAVA_HOME/lib/:$JAVA_HOME/jre/lib' >> /etc/profile
+echo 'export PATH=$JAVA_HOME/bin:$JAVA_HOME/jre/bin:$PATH:$HOMR' >> /etc/profile
+
+#重新加载配置文件
+echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+echo 重新加载配置文件
+source /etc/profile
+echo JAVA_HOME=$JAVA_HOME
+echo CLASSPATH=$CLASSPATH
+
+#查询java安装信息
+echo '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>'
+echo 查询java安装信息
+java -version
