@@ -28,7 +28,7 @@ FTP_USERS = {
     },
     'anonymous': {
         'password': '',  # 匿名用户无需密码
-        'permissions': ['read'],
+        'permissions': ['list'],  # 只能查看文件列表
         'home_dir': '/public',
         'description': '匿名账户'
     }

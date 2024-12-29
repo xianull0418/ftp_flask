@@ -165,6 +165,8 @@ class FTPService:
             
     def cmd_list(self, path):
         """处理LIST命令"""
+        if not self.check_permission(addr, 'list'):
+            return {'status': 'error', 'message': '没有列表权限'}
         try:
             print(f"\n=== 开始处理LIST命令 ===")
             print(f"请求路径: {path}")
@@ -370,7 +372,7 @@ class FTPService:
     def cmd_download(self, args, addr):
         """处理DOWNLOAD命令"""
         if not self.check_permission(addr, 'read'):
-            return {'status': 'error', 'message': '��有下载权限'}
+            return {'status': 'error', 'message': '没有下载权限'}
         filename = args.get('filename')
         if not filename:
             return {'status': 'error', 'message': '未提供文件名'}
@@ -439,7 +441,27 @@ class FTPService:
         """检查客户端权限"""
         if addr not in self.clients:
             return False
-        return required_permission in self.clients[addr]['permissions']
+        
+        # 获取用户权限
+        permissions = self.clients[addr]['permissions']
+        
+        # 特殊处理：如果需要下载权限，必须有 read 权限
+        if required_permission == 'read' and 'read' not in permissions:
+            return False
+        
+        # 特殊处理：如果需要上传权限，必须有 write 权限
+        if required_permission == 'write' and 'write' not in permissions:
+            return False
+        
+        # 特殊处理：如果需要删除权限，必须有 delete 权限
+        if required_permission == 'delete' and 'delete' not in permissions:
+            return False
+        
+        # 特殊处理：list 权限是基础权限，所有用户都应该有
+        if required_permission == 'list':
+            return True
+        
+        return required_permission in permissions
 
     def get_user_root_dir(self, addr):
         """获取用户的根目录"""

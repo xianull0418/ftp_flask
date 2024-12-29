@@ -61,6 +61,9 @@ function displayFiles(files) {
     const tbody = document.getElementById('fileListBody');
     tbody.innerHTML = '';
     
+    const server = connectedServers.get(currentConnectionId);
+    const canRead = server?.permissions.includes('read');
+    
     files.forEach(file => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
@@ -75,7 +78,9 @@ function displayFiles(files) {
             <td class="file-actions">
                 ${file.type === 'directory' 
                     ? `<button class="btn btn-secondary" onclick="showFiles('${currentPath}/${file.name}')">打开</button>`
-                    : `<button class="btn" onclick="downloadFile('${currentConnectionId}', '${currentPath}/${file.name}')">下载</button>`}
+                    : (canRead 
+                        ? `<button class="btn" onclick="downloadFile('${currentConnectionId}', '${currentPath}/${file.name}')">下载</button>`
+                        : '')}
             </td>
         `;
         tbody.appendChild(tr);
@@ -386,8 +391,8 @@ function updateUIByPermissions(connectionId) {
     files.forEach(file => {
         const actions = file.querySelector('.file-actions');
         if (actions) {
-            const downloadBtn = actions.querySelector('.btn-download');
-            if (downloadBtn) {
+            const downloadBtn = actions.querySelector('.btn');
+            if (downloadBtn && downloadBtn.textContent === '下载') {
                 downloadBtn.style.display = server.permissions.includes('read') ? 'inline-block' : 'none';
             }
         }
