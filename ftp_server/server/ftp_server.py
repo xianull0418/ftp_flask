@@ -29,11 +29,25 @@ class FTPService:
         # 确保根目录存在
         self.root_dir.mkdir(parents=True, exist_ok=True)
         
-        # 确保public目录存在
-        (self.root_dir / 'public').mkdir(exist_ok=True)
+        # 确保public目录存在并设置权限
+        public_dir = self.root_dir / 'public'
+        public_dir.mkdir(exist_ok=True)
+        
+        # 设置目录权限 (755 = rwxr-xr-x)
+        try:
+            public_dir.chmod(0o755)
+            # 在public目录中创建一个测试文件
+            test_file = public_dir / 'welcome.txt'
+            if not test_file.exists():
+                with open(test_file, 'w') as f:
+                    f.write('Welcome to FTP Server!\n')
+                test_file.chmod(0o644)  # 设置文件权限 (644 = rw-r--r--)
+        except Exception as e:
+            print(f"设置目录权限失败: {e}")
         
         print(f"\n=== FTP服务器初始化 ===")
         print(f"根目录: {self.root_dir}")
+        print(f"Public目录: {public_dir}")
         print(f"监听地址: {self.host}:{self.port}")
         
         # 初始化其他属性
@@ -126,7 +140,7 @@ class FTPService:
         if command == 'AUTH':
             return self.cmd_auth(args, addr)
         elif command == 'LIST':
-            return self.cmd_list(args.get('path', '/'))
+            return self.cmd_list(args.get('path', '/'), addr)
         elif command == 'UPLOAD':
             return self.cmd_upload(args, addr)
         elif command == 'DOWNLOAD':
@@ -163,7 +177,7 @@ class FTPService:
             'permissions': self.users[username]['permissions']
         }
             
-    def cmd_list(self, path):
+    def cmd_list(self, path, addr):
         """处理LIST命令"""
         if not self.check_permission(addr, 'list'):
             return {'status': 'error', 'message': '没有列表权限'}
@@ -172,20 +186,28 @@ class FTPService:
             print(f"请求路径: {path}")
             print(f"FTP根目录: {self.root_dir}")
             
+            # 获取用户的根目录
+            user_root = self.get_user_root_dir(addr)
+            print(f"用户根目录: {user_root}")
+            
             # 规范化请求路径
             if path == '/':
-                target_path = self.root_dir
+                target_path = user_root
             else:
-                target_path = (self.root_dir / path.lstrip('/')).resolve()
+                # 确保路径不会超出用户根目录
+                try:
+                    normalized_path = Path(path).resolve()
+                    target_path = (user_root / normalized_path.relative_to('/')).resolve()
+                except Exception:
+                    target_path = (user_root / path.lstrip('/')).resolve()
             
             print(f"目标完整路径: {target_path}")
-            print(f"root_dir: {self.root_dir}")
             
-            # 安全检查：确保目标路径在root_dir内
+            # 安全检查：确保目标路径在用户根目录内
             try:
-                target_path.relative_to(self.root_dir)
+                target_path.relative_to(user_root)
             except ValueError:
-                print(f"错误：访问限制 - 路径在root_dir外")
+                print(f"错误：访问限制 - 路径在用户根目录外")
                 return {'status': 'error', 'message': '访问被拒绝'}
             
             if not target_path.exists():
